@@ -65,6 +65,14 @@ function addPiece(square, symbol, color) {
 function handleDragStart(event) {
     draggedPiece = event.target;
     sourceSquare = draggedPiece.parentElement;
+
+    // Controleer of het stuk bij de huidige beurt hoort
+    if (draggedPiece.dataset.color !== currentTurn.toLowerCase()) {
+        event.preventDefault();
+        alert(`Het is de beurt van ${currentTurn}!`);
+        draggedPiece = null;
+        sourceSquare = null;
+    }
 }
 
 function handleDragOver(event) {
@@ -88,34 +96,10 @@ function handleDrop(event) {
         targetSquare.appendChild(draggedPiece);
         sourceSquare.innerHTML = "";
 
-        // Controleer promotie
-        if (pieceType === "pawn") {
-            const promotionRow = draggedPiece.dataset.color === "white" ? 0 : 7;
-            if (targetRow === promotionRow) {
-                promotePawn(draggedPiece);
-            }
-        }
-
-        // Controleer of de koning nu in schaak staat
-        if (isKingInCheck(currentTurn.toLowerCase())) {
-            alert("Je kunt deze zet niet doen; je staat schaak!");
-            sourceSquare.appendChild(draggedPiece);
-            if (originalPiece) targetSquare.appendChild(originalPiece);
-            return;
-        }
-
-        // Zet geldig, wissel beurt
+        // Wissel beurt
         currentTurn = currentTurn === "White" ? "Black" : "White";
         currentTurnDisplay.textContent = currentTurn;
 
-        // Controleer op schaak of schaakmat
-        if (isKingInCheck(currentTurn.toLowerCase())) {
-            if (!hasLegalMoves(currentTurn.toLowerCase())) {
-                alert(`Schaakmat! ${currentTurn === "White" ? "Zwart" : "Wit"} wint!`);
-            } else {
-                alert("Schaak!");
-            }
-        }
     } else {
         alert("Ongeldige zet!");
     }
@@ -124,45 +108,58 @@ function handleDrop(event) {
 // Controleer geldige zetten
 function isValidMove(type, sourceRow, sourceCol, targetRow, targetCol) {
     const rowDiff = targetRow - sourceRow;
-    const colDiff = Math.abs(targetCol - sourceCol);
+    const colDiff = targetCol - sourceCol;
+    const targetSquare = getSquare(targetRow, targetCol);
+    const targetPiece = targetSquare && targetSquare.firstChild;
 
     switch (type) {
         case "pawn":
-            const direction = draggedPiece.dataset.color === "white" ? -1 : 1; // Wit naar boven, zwart naar beneden
+            const direction = draggedPiece.dataset.color === "white" ? -1 : 1;
+            const startRow = draggedPiece.dataset.color === "white" ? 6 : 1;
 
-            // Voorwaartse beweging
-            if (colDiff === 0) {
-                if (rowDiff === direction && isSquareEmpty(targetRow, targetCol)) {
-                    return true; // Eén vakje naar voren
-                }
-                if (
-                    rowDiff === 2 * direction && 
-                    isSquareEmpty(targetRow, targetCol) &&
-                    isSquareEmpty(sourceRow + direction, sourceCol) &&
-                    ((draggedPiece.dataset.color === "white" && sourceRow === 6) || 
-                     (draggedPiece.dataset.color === "black" && sourceRow === 1))
-                ) {
-                    return true; // Twee vakjes naar voren (alleen vanaf startpositie)
-                }
-            }
+            if (
+                colDiff === 0 && // Vooruit bewegen
+                rowDiff === direction &&
+                !targetPiece
+            ) return true;
 
-            // Diagonaal slaan
-            if (colDiff === 1 && rowDiff === direction) {
-                const targetPiece = getPieceAt(targetRow, targetCol);
-                if (targetPiece && targetPiece.dataset.color !== draggedPiece.dataset.color) {
-                    return true; // Slaan
-                }
-            }
+            if (
+                colDiff === 0 &&
+                rowDiff === 2 * direction &&
+                sourceRow === startRow &&
+                !targetPiece &&
+                isSquareEmpty(sourceRow + direction, sourceCol)
+            ) return true;
 
-            return false; // Alle andere gevallen
+            if (
+                Math.abs(colDiff) === 1 && // Diagonaal slaan
+                rowDiff === direction &&
+                targetPiece &&
+                targetPiece.dataset.color !== draggedPiece.dataset.color
+            ) return true;
+
+            return false;
+
         case "rook":
-            return rowDiff === 0 || colDiff === 0;
+            return (
+                (rowDiff === 0 || colDiff === 0) &&
+                !isPathBlocked(sourceRow, sourceCol, targetRow, targetCol)
+            );
         case "knight":
-            return rowDiff * colDiff === 2;
+            return (
+                (Math.abs(rowDiff) === 2 && Math.abs(colDiff) === 1) ||
+                (Math.abs(rowDiff) === 1 && Math.abs(colDiff) === 2)
+            );
         case "bishop":
-            return Math.abs(rowDiff) === Math.abs(colDiff);
+            return (
+                Math.abs(rowDiff) === Math.abs(colDiff) &&
+                !isPathBlocked(sourceRow, sourceCol, targetRow, targetCol)
+            );
         case "queen":
-            return rowDiff === 0 || colDiff === 0 || Math.abs(rowDiff) === Math.abs(colDiff);
+            return (
+                (rowDiff === 0 || colDiff === 0 || Math.abs(rowDiff) === Math.abs(colDiff)) &&
+                !isPathBlocked(sourceRow, sourceCol, targetRow, targetCol)
+            );
         case "king":
             return Math.abs(rowDiff) <= 1 && Math.abs(colDiff) <= 1;
         default:
@@ -171,6 +168,25 @@ function isValidMove(type, sourceRow, sourceCol, targetRow, targetCol) {
 }
 
 // Helper functies
+function isPathBlocked(sourceRow, sourceCol, targetRow, targetCol) {
+    if (draggedPiece.dataset.type === "knight") return false;
+
+    const rowStep = targetRow > sourceRow ? 1 : targetRow < sourceRow ? -1 : 0;
+    const colStep = targetCol > sourceCol ? 1 : targetCol < sourceCol ? -1 : 0;
+
+    let currentRow = sourceRow + rowStep;
+    let currentCol = sourceCol + colStep;
+
+    while (currentRow !== targetRow || currentCol !== targetCol) {
+        if (!isSquareEmpty(currentRow, currentCol)) {
+            return true;
+        }
+        currentRow += rowStep;
+        currentCol += colStep;
+    }
+    return false;
+}
+
 function isSquareEmpty(row, col) {
     const square = getSquare(row, col);
     return square && !square.firstChild;
@@ -179,58 +195,19 @@ function isSquareEmpty(row, col) {
 function getSquare(row, col) {
     return document.querySelector(`.square[data-row="${row}"][data-col="${col}"]`);
 }
-
-function getPieceAt(row, col) {
-    const square = getSquare(row, col);
-    return square ? square.firstChild : null;
+// Voeg deze functie toe voor het opnieuw starten van het spel
+function restartGame() {
+    createBoard(); // Genereer het bord opnieuw
+    currentTurn = "White"; // Reset de beurt naar wit
+    currentTurnDisplay.textContent = currentTurn; // Update het display
 }
 
-function promotePawn(pawn) {
-    const choice = prompt("Promoveer je pion! Kies: queen, rook, knight, bishop", "queen");
-    const validChoices = ["queen", "rook", "knight", "bishop"];
-    const selectedPiece = validChoices.includes(choice) ? choice : "queen";
+// Voeg een event listener toe aan de "Restart Game"-knop
+const restartButton = document.getElementById("restart-button");
+restartButton.addEventListener("click", restartGame);
 
-    const newSymbol = pieces[pawn.dataset.color][selectedPiece];
-    pawn.textContent = newSymbol;
-    pawn.dataset.type = selectedPiece;
-}
-
-// Schaak en schaakmatcontrole
-function isKingInCheck(color) {
-    const opponentColor = color === "white" ? "black" : "white";
-    let kingSquare = null;
-
-    document.querySelectorAll(".square").forEach(square => {
-        const piece = square.firstChild;
-        if (piece && piece.dataset.type === "king" && piece.dataset.color === color) {
-            kingSquare = square;
-        }
-    });
-
-    for (let square of document.querySelectorAll(".square")) {
-        const piece = square.firstChild;
-        if (piece && piece.dataset.color === opponentColor) {
-            if (isValidMove(piece.dataset.type, parseInt(square.dataset.row), parseInt(square.dataset.col), parseInt(kingSquare.dataset.row), parseInt(kingSquare.dataset.col))) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-function hasLegalMoves(color) {
-    for (let square of document.querySelectorAll(".square")) {
-        const piece = square.firstChild;
-        if (piece && piece.dataset.color === color) {
-            for (let targetSquare of document.querySelectorAll(".square")) {
-                if (isValidMove(piece.dataset.type, parseInt(square.dataset.row), parseInt(square.dataset.col), parseInt(targetSquare.dataset.row), parseInt(targetSquare.dataset.col))) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
+// Bestaande code hieronder blijft ongewijzigd
+createBoard();
 
 // Bord maken
 createBoard();
