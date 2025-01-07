@@ -8,5 +8,5 @@ function showSettings() {
 }
 
 function showAbout() {
-    alert("Chess Web Game v1.0\nDeveloped by You!");
+    alert("Chess Web Game v1.0\nDeveloped by Joeri!");
 }
