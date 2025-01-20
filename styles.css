@@ -53,3 +53,17 @@ header {
     cursor: grab;
     user-select: none;
 }
+@keyframes boardSlideIn {
+    from {
+        transform: translateY(-100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+#board {
+    animation: boardSlideIn 0.8s ease-out;
+}
