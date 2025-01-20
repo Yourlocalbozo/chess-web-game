@@ -1,5 +1,6 @@
 const board = document.getElementById("board");
 const currentTurnDisplay = document.getElementById("current-turn");
+const restartButton = document.getElementById("restart-button");
 let draggedPiece = null;
 let sourceSquare = null;
 let currentTurn = "White";
@@ -13,6 +14,9 @@ const pieces = {
 // Bord maken en stukken plaatsen
 function createBoard() {
     board.innerHTML = ""; // Leeg het bord
+    document.getElementById("captured-white").innerHTML = "Captured by White:";
+    document.getElementById("captured-black").innerHTML = "Captured by Black:";
+
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
             const square = document.createElement("div");
@@ -91,6 +95,12 @@ function handleDrop(event) {
 
     if (isValidMove(pieceType, sourceRow, sourceCol, targetRow, targetCol)) {
         const originalPiece = targetSquare.firstChild;
+
+        // Controleer of er een stuk op het doelsquare staat
+        if (originalPiece && originalPiece.dataset.color !== draggedPiece.dataset.color) {
+            capturePiece(originalPiece); // Voeg geslagen stuk toe aan captures
+            targetSquare.innerHTML = ""; // Verwijder geslagen stuk van het bord
+        }
 
         // Zet uitvoeren
         targetSquare.appendChild(draggedPiece);
@@ -195,19 +205,28 @@ function isSquareEmpty(row, col) {
 function getSquare(row, col) {
     return document.querySelector(`.square[data-row="${row}"][data-col="${col}"]`);
 }
-// Voeg deze functie toe voor het opnieuw starten van het spel
+
+// Capturesysteem
+function capturePiece(piece) {
+    const capturedContainer = piece.dataset.color === "white" 
+        ? document.getElementById("captured-black") 
+        : document.getElementById("captured-white");
+
+    const capturedPiece = document.createElement("div");
+    capturedPiece.textContent = piece.textContent;
+    capturedPiece.classList.add("captured-piece");
+    capturedContainer.appendChild(capturedPiece);
+}
+
+// Herstart het spel
 function restartGame() {
     createBoard(); // Genereer het bord opnieuw
     currentTurn = "White"; // Reset de beurt naar wit
     currentTurnDisplay.textContent = currentTurn; // Update het display
 }
 
-// Voeg een event listener toe aan de "Restart Game"-knop
-const restartButton = document.getElementById("restart-button");
+// Event listener voor herstarten
 restartButton.addEventListener("click", restartGame);
-
-// Bestaande code hieronder blijft ongewijzigd
-createBoard();
 
 // Bord maken
 createBoard();
